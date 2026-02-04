@@ -1,73 +1,98 @@
-# React + TypeScript + Vite
+# Himuria
+**NBA Playoff Community App**
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern web application for NBA playoff predictions, leaderboards, and community engagement.
 
-Currently, two official plugins are available:
+## 🏀 About
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Himuria is a community-driven platform where NBA fans can:
+- Make predictions for playoff series, champions, and Finals MVP
+- Compete on leaderboards based on prediction accuracy
+- Follow live game updates and scores
+- Engage with other basketball fans
 
-## React Compiler
+## 🚀 Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: TailwindCSS
+- **Routing**: React Router v6
+- **i18n**: i18next (English + Hebrew with RTL support)
+- **Backend** (Coming in Step 2): Supabase
 
-## Expanding the ESLint configuration
+## 📁 Project Structure
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── app/          # Router and layout configuration
+├── pages/        # All page components
+├── components/   # Reusable UI components
+├── i18n/         # Internationalization files
+└── lib/          # Utility functions and helpers
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🛠️ Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Prerequisites
+- Node.js 18+ and npm
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Getting Started
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Start development server:**
+   ```bash
+   npm run dev
+   ```
+
+3. **Build for production:**
+   ```bash
+   npm run build
+   ```
+
+4. **Preview production build:**
+   ```bash
+   npm run preview
+   ```
+
+## 🌐 Available Routes
+
+- `/` - Landing page
+- `/auth` - Authentication hub
+- `/login` - Login page
+- `/register` - Registration page
+- `/home` - Home feed
+- `/predictions` - Predictions hub
+- `/predictions/series/:seriesId` - Series prediction
+- `/predictions/champion` - Champion pick
+- `/predictions/mvp` - Finals MVP pick
+- `/leaderboard` - Leaderboard
+- `/game/:gameId` - Game details
+- `/profile` - User profile and settings
+
+## 🌍 Language Support
+
+The app supports English and Hebrew with full RTL (Right-to-Left) support. Use the language toggle in the header to switch between languages.
+
+## 📝 Development Status
+
+**Step 1: Basic Structure** ✅ (Current)
+- Project setup and configuration
+- All pages with placeholder UI
+- Routing and navigation
+- i18n structure
+
+**Step 2: Authentication** (Next)
+- Supabase integration
+- User authentication
+- Protected routes
+- User profiles
+
+**Step 3: Backend Integration** (Future)
+- Real-time game data
+- Prediction submission and tracking
+- Leaderboard calculations
+- Social features
