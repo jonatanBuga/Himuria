@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Himuria — Playoff Prediction Club</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-glow"></div>
+    <header class="site-header">
+      <div class="brand">
+        <span class="dot"></span>
+        <div>
+          <p class="eyebrow">Himuria</p>
+          <h1>Community NBA Playoff Predictions</h1>
+        </div>
+      </div>
+      <nav class="site-nav">
+        <a href="#how">How It Works</a>
+        <a href="#games">Games</a>
+        <a href="#leaderboard">Leaderboard</a>
+        <button class="primary" id="joinClub">Join Club</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="tag">MVP • Private friends pool</p>
+          <h2>Make picks, earn points, and keep the rivalry friendly.</h2>
+          <p class="sub">Himuria is a lightweight playoff prediction space for your crew. Pick winners, choose margins, and watch your leaderboard update after every game.</p>
+          <div class="hero-actions">
+            <button class="primary" id="makePick">Make a Prediction</button>
+            <button class="ghost" id="viewRules">View Scoring</button>
+          </div>
+          <div class="stats">
+            <div>
+              <h3 id="activeMembers">18</h3>
+              <p>Active members</p>
+            </div>
+            <div>
+              <h3 id="totalPicks">126</h3>
+              <p>Picks submitted</p>
+            </div>
+            <div>
+              <h3 id="pointsPool">2,460</h3>
+              <p>Total points</p>
+            </div>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="card-header">
+            <h4>Tonight's spotlight</h4>
+            <span class="pill">Game 4</span>
+          </div>
+          <div class="matchup">
+            <div>
+              <p class="team">Denver Nuggets</p>
+              <p class="seed">#3 West</p>
+            </div>
+            <span class="vs">vs</span>
+            <div class="right">
+              <p class="team">Minnesota Timberwolves</p>
+              <p class="seed">#2 West</p>
+            </div>
+          </div>
+          <div class="card-row">
+            <p>Tip-off</p>
+            <p class="bold">8:30 PM ET</p>
+          </div>
+          <div class="card-row">
+            <p>Community pick</p>
+            <p class="bold" id="communityPick">Nuggets (54%)</p>
+          </div>
+          <button class="primary full" id="quickPick">Lock in pick</button>
+          <p class="fine">Deadline closes 15 minutes before tip-off.</p>
+        </div>
+      </section>
+
+      <section class="panel" id="how">
+        <div class="panel-title">
+          <h3>How Himuria Works</h3>
+          <p>Built for the playoffs. Minimal setup, maximum bragging rights.</p>
+        </div>
+        <div class="grid-3">
+          <div class="tile">
+            <h4>1. Join your club</h4>
+            <p>Invite friends, set a private code, and decide whether you want single-game or series picks.</p>
+          </div>
+          <div class="tile">
+            <h4>2. Submit predictions</h4>
+            <p>Pick winners, select a margin, and optionally choose a player prop for bonus points.</p>
+          </div>
+          <div class="tile">
+            <h4>3. Track points</h4>
+            <p>Scoring updates automatically after every game. Leaderboard resets each round.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="games">
+        <div class="panel-title">
+          <h3>Upcoming Games</h3>
+          <p>Use this MVP list to capture the next slate. Replace with real data later.</p>
+        </div>
+        <div class="game-list" id="gameList"></div>
+      </section>
+
+      <section class="panel split">
+        <div class="panel-title">
+          <h3>Submit a Prediction</h3>
+          <p>Fast entry form: pick winner, margin, and confidence. Results are stored locally for the MVP.</p>
+        </div>
+        <form class="prediction-form" id="predictionForm">
+          <label>
+            Game
+            <select id="gameSelect" required></select>
+          </label>
+          <label>
+            Winner
+            <select id="winnerSelect" required></select>
+          </label>
+          <label>
+            Margin (points)
+            <input type="number" id="marginInput" min="1" max="30" placeholder="10" required />
+          </label>
+          <label>
+            Confidence
+            <input type="range" id="confidenceInput" min="1" max="5" value="3" />
+          </label>
+          <div class="form-row">
+            <p class="fine">Confidence 1 = low, 5 = lock.</p>
+            <button class="primary" type="submit">Save pick</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel" id="leaderboard">
+        <div class="panel-title">
+          <h3>Leaderboard</h3>
+          <p>Points for this MVP are mock data. Hook it to a backend later.</p>
+        </div>
+        <div class="leaderboard" id="leaderboardList"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h3>Recent Picks</h3>
+          <p>See your local submissions and share screenshots in your group chat.</p>
+        </div>
+        <div class="picks" id="picksList"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div>
+        <h4>Himuria MVP</h4>
+        <p>Prediction club for NBA playoff nights. Crafted for friends who talk hoops.</p>
+      </div>
+      <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Contact</a>
+      </div>
+    </footer>
+
+    <div class="modal" id="rulesModal" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h4>Scoring Rules</h4>
+          <button class="ghost" id="closeModal">Close</button>
+        </div>
+        <ul>
+          <li>Winner pick: 10 points</li>
+          <li>Margin within 5 points: +5 bonus</li>
+          <li>Confidence multiplier: 1x to 1.5x</li>
+          <li>Perfect prediction: +10 bonus</li>
+        </ul>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
