@@ -1,0 +1,15 @@
+{
+  "appName": "Himuria",
+  "home": "Home",
+  "predictions": "Predictions",
+  "leaderboard": "Leaderboard",
+  "profile": "Profile",
+  "login": "Login",
+  "register": "Register",
+  "auth": "Authentication",
+  "welcome": "Welcome to Himuria",
+  "welcomeDescription": "Your NBA Playoff Community App",
+  "notFound": "Page Not Found",
+  "notFoundDescription": "The page you're looking for doesn't exist.",
+  "goHome": "Go Home"
+}

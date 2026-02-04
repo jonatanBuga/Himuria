@@ -1,0 +1,15 @@
+{
+  "appName": "חימוריה",
+  "home": "בית",
+  "predictions": "תחזיות",
+  "leaderboard": "לוח מובילים",
+  "profile": "פרופיל",
+  "login": "התחברות",
+  "register": "הרשמה",
+  "auth": "אימות",
+  "welcome": "ברוכים הבאים לחימוריה",
+  "welcomeDescription": "אפליקציית קהילת פלייאוף NBA שלך",
+  "notFound": "הדף לא נמצא",
+  "notFoundDescription": "הדף שאתה מחפש לא קיים.",
+  "goHome": "חזרה לבית"
+}
