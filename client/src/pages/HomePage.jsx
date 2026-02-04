@@ -1,9 +1,10 @@
 import React from 'react';
+import { useLanguage } from '../contexts/LanguageContext.jsx';
 
 const highlights = [
-  { label: 'Active friends', value: '12' },
-  { label: 'Picks submitted', value: '64' },
-  { label: 'Round points', value: '840' },
+  { label: 'home.stats.members', value: '12' },
+  { label: 'home.stats.picks', value: '64' },
+  { label: 'home.stats.points', value: '840' },
 ];
 
 const nextGames = [
@@ -12,21 +13,21 @@ const nextGames = [
 ];
 
 export default function HomePage() {
+  const { t } = useLanguage();
+
   return (
     <div className="page">
       <section className="card hero-card">
         <div>
-          <p className="eyebrow">Round 2</p>
-          <h2>Welcome to your playoff club.</h2>
-          <p className="muted">
-            Lock in predictions before tip-off and earn points with every correct pick.
-          </p>
+          <p className="eyebrow">{t('home.round')}</p>
+          <h2>{t('home.headline')}</h2>
+          <p className="muted">{t('home.copy')}</p>
         </div>
         <div className="stat-grid">
           {highlights.map((item) => (
             <div key={item.label} className="stat-card">
               <h3>{item.value}</h3>
-              <p className="muted">{item.label}</p>
+              <p className="muted">{t(item.label)}</p>
             </div>
           ))}
         </div>
@@ -34,8 +35,8 @@ export default function HomePage() {
 
       <section className="card">
         <div className="card-header">
-          <h3>Upcoming tip-offs</h3>
-          <span className="accent">Live board</span>
+          <h3>{t('home.upcomingTitle')}</h3>
+          <span className="accent">{t('home.upcomingTag')}</span>
         </div>
         <div className="list">
           {nextGames.map((game) => (
@@ -44,7 +45,9 @@ export default function HomePage() {
                 <p className="strong">{game.matchup}</p>
                 <p className="muted">{game.time}</p>
               </div>
-              <button className="ghost">Predict</button>
+              <button className="primary" type="button">
+                {t('home.predict')}
+              </button>
             </div>
           ))}
         </div>

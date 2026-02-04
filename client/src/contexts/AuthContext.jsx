@@ -15,7 +15,8 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     setAuth(null);
-    localStorage.removeItem('himuria_auth');
+    // Clear local storage to remove session and related cached data.
+    localStorage.clear();
   };
 
   const value = useMemo(() => ({ auth, login, logout }), [auth]);

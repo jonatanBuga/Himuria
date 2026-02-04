@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { registerUser } from '../api.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
+import { useLanguage } from '../contexts/LanguageContext.jsx';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -15,7 +17,7 @@ export default function RegisterPage() {
   async function handleSubmit(event) {
     event.preventDefault();
     if (password !== confirm) {
-      setError('Passwords do not match.');
+      setError(t('register.mismatch'));
       return;
     }
     setError('');
@@ -35,50 +37,50 @@ export default function RegisterPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div>
-          <p className="eyebrow">Get started</p>
-          <h1>Create your Himuria account</h1>
-          <p className="muted">You only need an email and password to join the club.</p>
+          <p className="eyebrow">{t('register.eyebrow')}</p>
+          <h1>{t('register.headline')}</h1>
+          <p className="muted">{t('register.copy')}</p>
         </div>
         <form className="auth-form" onSubmit={handleSubmit}>
           <label>
-            Email
+            {t('auth.email')}
             <input
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
               required
             />
           </label>
           <label>
-            Password
+            {t('auth.password')}
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Create a password"
+              placeholder={t('register.passwordPlaceholder')}
               minLength={6}
               required
             />
           </label>
           <label>
-            Confirm password
+            {t('register.confirm')}
             <input
               type="password"
               value={confirm}
               onChange={(event) => setConfirm(event.target.value)}
-              placeholder="Repeat password"
+              placeholder={t('register.confirmPlaceholder')}
               minLength={6}
               required
             />
           </label>
           {error && <p className="error">{error}</p>}
           <button className="primary" type="submit" disabled={loading}>
-            {loading ? 'Creating...' : 'Create account'}
+            {loading ? t('register.creating') : t('register.create')}
           </button>
         </form>
         <p className="fine">
-          Already have an account? <Link to="/login">Sign in</Link>
+          {t('register.haveAccount')} <Link to="/login">{t('register.signIn')}</Link>
         </p>
       </div>
     </div>
