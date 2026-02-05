@@ -15,7 +15,8 @@ const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET?.trim();
 const ADMIN_USER_IDS = (process.env.ADMIN_USER_IDS || '').split(',').filter(Boolean);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SUPABASE_JWT_SECRET) {
-  console.warn('Missing Supabase environment variables.');
+  console.error('Missing Supabase environment variables. Check server/.env (no spaces around =).');
+  process.exit(1);
 }
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -55,7 +56,7 @@ async function requireAuth(req, res, next) {
 
   try {
     const { payload } = await verifySupabaseJwt(token);
-    req.user = { id: payload.sub, role: payload.role };
+    req.user = { id: payload.sub, role: payload.role, email: payload.email };
     return next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid token.' });
@@ -85,9 +86,26 @@ app.get('/api/profile/me', requireAuth, async (req, res) => {
     .from('profiles')
     .select('*')
     .eq('id', req.user.id)
-    .single();
+    .limit(1)
+    .maybeSingle();
 
   if (error) return res.status(400).json({ error: error.message });
+
+  if (!data) {
+    const { data: created, error: createError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: req.user.id,
+        email: req.user.email || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select('*')
+      .single();
+    if (createError) return res.status(400).json({ error: createError.message });
+    return res.json(created);
+  }
+
   return res.json(data);
 });
 
@@ -106,20 +124,41 @@ app.put('/api/draft/season', requireAuth, async (req, res) => {
     updated_at: new Date().toISOString(),
   };
 
-  const { data, error } = await supabaseAdmin
+  // Manual upsert so we don't require a unique constraint on user_id.
+  const { data: existing, error: existingError } = await supabaseAdmin
     .from('season_picks_draft')
-    .upsert(payload, { onConflict: 'user_id' })
-    .select('*')
-    .single();
+    .select('id')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
 
-  if (error) return res.status(400).json({ error: error.message });
+  if (existingError) return res.status(400).json({ error: existingError.message });
+
+  let saved;
+  if (existing?.id) {
+    const { data, error } = await supabaseAdmin
+      .from('season_picks_draft')
+      .update(payload)
+      .eq('id', existing.id)
+      .select('*')
+      .single();
+    if (error) return res.status(400).json({ error: error.message });
+    saved = data;
+  } else {
+    const { data, error } = await supabaseAdmin
+      .from('season_picks_draft')
+      .insert(payload)
+      .select('*')
+      .single();
+    if (error) return res.status(400).json({ error: error.message });
+    saved = data;
+  }
 
   await supabaseAdmin
     .from('profiles')
     .update({ has_onboarded: true, updated_at: new Date().toISOString() })
     .eq('id', req.user.id);
 
-  return res.json(data);
+  return res.json(saved);
 });
 
 app.get('/api/draft/season', requireAuth, async (req, res) => {
@@ -244,6 +283,93 @@ app.get('/api/series', requireAuth, async (_req, res) => {
   const { data, error } = await supabaseAdmin.from('series').select('*').order('start_time');
   if (error) return res.status(400).json({ error: error.message });
   return res.json(data || []);
+});
+
+app.get('/api/analytics/round', requireAuth, async (req, res) => {
+  console.log('[analytics] user', req.user.id);
+  // Draft-only analytics source (no committed).
+  const { data: drafts, error: draftsError } = await supabaseAdmin
+    .from('series_picks_draft')
+    .select('*');
+  if (draftsError) return res.status(400).json({ error: draftsError.message });
+  const seriesIds = Array.from(new Set((drafts || []).map((row) => row.series_id)));
+  console.log('[analytics] seriesIds', seriesIds);
+  console.log('[analytics] draft picks count', drafts?.length || 0);
+
+  const userIds = Array.from(new Set((drafts || []).map((row) => row.user_id))).filter(Boolean);
+  const { data: profiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id,email')
+    .in('id', userIds);
+  const profileMap = new Map((profiles || []).map((p) => [p.id, p.email]));
+
+  const draftsBySeries = new Map();
+  (drafts || []).forEach((row) => {
+    const list = draftsBySeries.get(row.series_id) || [];
+    list.push(row);
+    draftsBySeries.set(row.series_id, list);
+  });
+
+  // Optional conference mapping from series table if present.
+  const { data: seriesRows } = await supabaseAdmin.from('series').select('*').in('series_id', seriesIds);
+  const conferenceMap = new Map((seriesRows || []).map((row) => [row.series_id, row.conference]));
+  const teamConferenceMap = new Map([
+    ['Celtics', 'EAST'], ['Knicks', 'EAST'], ['Bucks', 'EAST'], ['76ers', 'EAST'], ['Heat', 'EAST'], ['Cavaliers', 'EAST'],
+    ['Nuggets', 'WEST'], ['Timberwolves', 'WEST'], ['Thunder', 'WEST'], ['Mavericks', 'WEST'], ['Lakers', 'WEST'], ['Suns', 'WEST'],
+  ]);
+
+  const teamAgg = new Map();
+  const seriesAnalytics = seriesIds.map((seriesId) => {
+    const picks = draftsBySeries.get(seriesId) || [];
+    const totalUsers = new Set(picks.map((p) => p.user_id)).size;
+    let teamACount = 0;
+    let teamBCount = 0;
+    picks.forEach((p) => {
+      const email = profileMap.get(p.user_id) || 'Unknown';
+      if (p.team_a_wins === 4) {
+        teamACount += 1;
+        const conf = conferenceMap.get(seriesId) || teamConferenceMap.get(p.team_a) || 'EAST';
+        const key = `${conf}:${p.team_a}`;
+        const agg = teamAgg.get(key) || { team: p.team_a, conference: conf, count: 0, users: [] };
+        agg.count += 1;
+        agg.users.push(email);
+        teamAgg.set(key, agg);
+      }
+      if (p.team_b_wins === 4) {
+        teamBCount += 1;
+        const conf = conferenceMap.get(seriesId) || teamConferenceMap.get(p.team_b) || 'WEST';
+        const key = `${conf}:${p.team_b}`;
+        const agg = teamAgg.get(key) || { team: p.team_b, conference: conf, count: 0, users: [] };
+        agg.count += 1;
+        agg.users.push(email);
+        teamAgg.set(key, agg);
+      }
+    });
+    const userPick = picks.find((p) => p.user_id === req.user.id) || null;
+    return {
+      series_id: seriesId,
+      team_a: picks[0]?.team_a || '',
+      team_b: picks[0]?.team_b || '',
+      team_a_count: teamACount,
+      team_b_count: teamBCount,
+      total_users: totalUsers,
+      user_picked: Boolean(userPick),
+    };
+  });
+
+  const pickedCount = seriesAnalytics.filter((s) => s.user_picked).length;
+  const totalSeries = seriesAnalytics.length;
+  const eastTeams = Array.from(teamAgg.values()).filter((t) => t.conference === 'EAST');
+  const westTeams = Array.from(teamAgg.values()).filter((t) => t.conference === 'WEST');
+
+  return res.json({
+    round: 'DRAFT',
+    totalSeries,
+    pickedCount,
+    notPickedCount: Math.max(0, totalSeries - pickedCount),
+    east: eastTeams,
+    west: westTeams,
+  });
 });
 
 app.post('/api/admin/series/upsert', requireAuth, requireAdmin, async (req, res) => {

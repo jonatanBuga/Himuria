@@ -22,10 +22,11 @@ export function AuthProvider({ children }) {
         id: session.user.id,
         email,
         token,
-        hasSeasonPicks: profile.has_onboarded,
+        hasSeasonPicks: profile?.has_onboarded ?? false,
         profile,
       });
     } catch (err) {
+      console.warn('Profile fetch failed, continuing without profile.', err);
       setAuth({ id: session.user.id, email, token, hasSeasonPicks: false });
     } finally {
       setLoading(false);

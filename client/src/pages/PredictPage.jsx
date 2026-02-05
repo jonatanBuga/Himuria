@@ -8,6 +8,10 @@ import {
   saveSeriesDraft,
   commitSeriesPick,
 } from '../api.js';
+import { supabase } from '../supabaseClient.js';
+import useSeriesPicks from '../hooks/useSeriesPicks.js';
+import SeriesPickCard from '../components/SeriesPickCard.jsx';
+import { getSeriesPayload, isValidSeriesWins, saveDraftPick } from '../seriesPickUtils.js';
 
 // Mock fallback series data for MVP if backend is empty.
 const fallbackSeries = [
@@ -74,10 +78,16 @@ export default function PredictPage() {
   const [now, setNow] = useState(Date.now());
   const [toast, setToast] = useState('');
   const [series, setSeries] = useState([]);
-  const [drafts, setDrafts] = useState([]);
-  const [committed, setCommitted] = useState([]);
+  const { drafts, committed, setDrafts, setCommitted, error: picksError } = useSeriesPicks(auth?.token);
   const committedRef = React.useRef(new Set());
   const [saveError, setSaveError] = useState('');
+  const [loadError, setLoadError] = useState('');
+
+  const getToken = async () => {
+    if (auth?.token) return auth.token;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token;
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -91,23 +101,22 @@ export default function PredictPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!auth?.token) return;
     let active = true;
-    Promise.all([
-      fetchSeriesSchedule(auth.token),
-      fetchSeriesDraft(auth.token),
-      fetchSeriesCommitted(auth.token),
-    ])
-      .then(([seriesData, draftData, committedData]) => {
+    const load = async () => {
+      const token = await getToken();
+      if (!token) return;
+      try {
+        const seriesData = await fetchSeriesSchedule(token);
         if (!active) return;
         setSeries(seriesData.length ? seriesData : fallbackSeries);
-        setDrafts(draftData || []);
-        setCommitted(committedData || []);
-      })
-      .catch(() => {
+        setLoadError('');
+      } catch (err) {
         if (!active) return;
         setSeries(fallbackSeries);
-      });
+        setLoadError(err?.message || 'Failed to load picks.');
+      }
+    };
+    load();
 
     return () => {
       active = false;
@@ -116,8 +125,10 @@ export default function PredictPage() {
 
   useEffect(() => {
     // Auto-commit drafts at lock time (client-side trigger).
-    if (!auth?.token || !series.length) return;
+    if (!series.length) return;
     const timer = setInterval(async () => {
+      const token = await getToken();
+      if (!token) return;
       for (const row of series) {
         const lockAt = new Date(row.start_time).getTime() - 60 * 1000;
         const key = `${row.series_id}`;
@@ -130,7 +141,7 @@ export default function PredictPage() {
             continue;
           }
           try {
-            const saved = await commitSeriesPick(auth.token, row.series_id);
+            const saved = await commitSeriesPick(token, row.series_id);
             if (saved && saved.series_id) {
               setCommitted((prev) => {
                 const filtered = prev.filter((p) => p.series_id !== saved.series_id);
@@ -145,7 +156,7 @@ export default function PredictPage() {
     }, 10000);
 
     return () => clearInterval(timer);
-  }, [auth?.token, series, drafts, committed]);
+  }, [series, drafts, committed]);
 
   const activeSeries = useMemo(
     () =>
@@ -170,26 +181,24 @@ export default function PredictPage() {
     });
     console.log('Auth user id', auth?.id);
     if (locked) return;
-    if (!auth?.token) {
+    const token = await getToken();
+    if (!token) {
       setSaveError('No authenticated user.');
       console.warn('No authenticated user token.');
       return;
     }
-    const payload = {
-      series_id: seriesRow.series_id || seriesRow.id,
-      team_a: seriesRow.team_a || seriesRow.teamA,
-      team_b: seriesRow.team_b || seriesRow.teamB,
-      team_a_wins: winsA,
-      team_b_wins: winsB,
-      start_time: seriesRow.start_time,
-    };
+    const payload = getSeriesPayload(seriesRow, winsA, winsB);
     if (!payload.series_id || !payload.team_a || !payload.team_b) {
       setSaveError('Series and team data are required.');
       console.warn('Missing series payload fields', payload);
       return;
     }
+    if (!isValidSeriesWins(winsA, winsB)) {
+      setSaveError('Invalid series result.');
+      return;
+    }
     try {
-      const saved = await saveSeriesDraft(auth.token, payload);
+      const saved = await saveDraftPick(token, seriesRow, winsA, winsB);
       console.log('Draft upsert response', saved);
       setDrafts((prev) => {
         const filtered = prev.filter((item) => item.series_id !== seriesRow.series_id);
@@ -232,7 +241,7 @@ export default function PredictPage() {
 
         <div className="series-grid">
           {activeSeries.map((seriesRow) => (
-            <SeriesCard
+            <SeriesPickCard
               key={seriesRow.series_id}
               series={seriesRow}
               now={now}
@@ -244,6 +253,8 @@ export default function PredictPage() {
           ))}
         </div>
         {saveError && <p className="error">{saveError}</p>}
+        {loadError && <p className="error">{loadError}</p>}
+        {picksError && <p className="error">{picksError}</p>}
       </section>
 
       <section className="card">
@@ -268,10 +279,10 @@ export default function PredictPage() {
           </div>
         </div>
         <div className="list">
-          {drafts.length === 0 ? (
+          {drafts.length === 0 && committed.length === 0 ? (
             <p className="muted">{t('predict.emptyPicks')}</p>
           ) : (
-            drafts.map((pick) => (
+            [...drafts, ...committed].map((pick) => (
               <div key={pick.series_id} className="list-item saved-pick">
                 <div>
                   <p className="strong">{pick.team_a} vs {pick.team_b}</p>
@@ -286,98 +297,6 @@ export default function PredictPage() {
 
       {toast && <div className="toast">{toast}</div>}
     </div>
-  );
-}
-
-function SeriesCard({ series, now, t, onSave, draft, committed }) {
-  const lockAt = new Date(series.start_time).getTime() - 60 * 1000;
-  const locked = now >= lockAt || committed?.locked;
-
-  const initialWinsA = committed?.team_a_wins ?? draft?.team_a_wins ?? 4;
-  const initialWinsB = committed?.team_b_wins ?? draft?.team_b_wins ?? 2;
-  const [winsA, setWinsA] = useState(initialWinsA);
-  const [winsB, setWinsB] = useState(initialWinsB);
-
-  useEffect(() => {
-    setWinsA(initialWinsA);
-    setWinsB(initialWinsB);
-  }, [initialWinsA, initialWinsB]);
-
-  const isValid = useMemo(() => {
-    // Valid series outcome: one team reaches 4 wins, the other is 0-3.
-    const a = Number(winsA);
-    const b = Number(winsB);
-    return (a === 4 && b <= 3) || (b === 4 && a <= 3);
-  }, [winsA, winsB]);
-
-  const handleInput = (setter) => (event) => {
-    const value = event.target.value === '' ? '' : Number(event.target.value);
-    if (value === '' || (Number.isInteger(value) && value >= 0 && value <= 4)) {
-      setter(value);
-    }
-  };
-
-  return (
-    <article className={`series-card ${locked ? 'is-locked' : ''}`}>
-      <div className="series-meta">
-        <div className="lock">
-          <span className="clock" aria-hidden="true" />
-          {locked ? t('predict.locked') : `${t('predict.locksIn')}: ${formatCountdown(lockAt, now)}`}
-        </div>
-      </div>
-      <div className="series-body">
-        <div className="series-side">
-          <div className="team-block">
-            <div className="logo" aria-hidden="true">{series.team_a?.slice(0, 3).toUpperCase()}</div>
-            <p className="strong">{series.team_a}</p>
-          </div>
-          <div className="wins-block">
-            <input
-              type="number"
-              min="0"
-              max="4"
-              step="1"
-              value={winsA}
-              onChange={handleInput(setWinsA)}
-              disabled={locked}
-              aria-label={`${series.team_a} wins`}
-            />
-            <span className="wins-label">{t('predict.winsLabel')}</span>
-          </div>
-        </div>
-        <div className="score-block">
-          <span className="dash">-</span>
-          <p className="helper">{t('predict.helper')}</p>
-        </div>
-        <div className="series-side">
-          <div className="team-block">
-            <div className="logo" aria-hidden="true">{series.team_b?.slice(0, 3).toUpperCase()}</div>
-            <p className="strong">{series.team_b}</p>
-          </div>
-          <div className="wins-block">
-            <input
-              type="number"
-              min="0"
-              max="4"
-              step="1"
-              value={winsB}
-              onChange={handleInput(setWinsB)}
-              disabled={locked}
-              aria-label={`${series.team_b} wins`}
-            />
-            <span className="wins-label">{t('predict.winsLabel')}</span>
-          </div>
-        </div>
-      </div>
-      <button
-        className="primary full"
-        type="button"
-        disabled={!isValid || locked}
-        onClick={() => onSave(series, Number(winsA), Number(winsB), locked)}
-      >
-        {t('predict.save')}
-      </button>
-    </article>
   );
 }
 

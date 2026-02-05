@@ -99,3 +99,11 @@ export async function fetchSeriesSchedule(token) {
     },
   });
 }
+
+export async function fetchRoundAnalytics(token) {
+  return request('/analytics/round', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}

@@ -369,6 +369,23 @@ h3 {
   animation: scaleIn 220ms ease;
 }
 
+.mini-card {
+  position: relative;
+  width: min(560px, 100%);
+}
+
+.close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.2rem;
+}
+
 .overlay-header {
   display: flex;
   justify-content: space-between;
@@ -452,6 +469,221 @@ h3 {
 
 .saved-pick {
   align-items: center;
+}
+
+.analytics-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.analytics-card {
+  background: var(--white);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.legend {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--gray);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.dot.picked {
+  background: var(--orange);
+}
+
+.dot.not-picked {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.bar-chart {
+  display: grid;
+  gap: 10px;
+}
+
+.bar-row {
+  display: grid;
+  gap: 6px;
+}
+
+.bar-label {
+  font-size: clamp(0.7rem, 1.4vw, 0.85rem);
+  color: var(--gray);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.bar-fill {
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #000;
+  font-size: clamp(0.65rem, 1.2vw, 0.75rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.bar-fill.a {
+  background: rgba(255, 122, 0, 0.25);
+}
+
+.bar-fill.b {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.column-chart {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  gap: 10px;
+  align-items: end;
+  height: 200px;
+  --label-height: 22px;
+  overflow: visible;
+}
+
+.y-axis {
+  display: grid;
+  height: 100%;
+  justify-items: center;
+  font-size: 0.7rem;
+  color: var(--gray);
+  padding-bottom: var(--label-height);
+  box-sizing: border-box;
+}
+
+.chart-area {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  height: 100%;
+  overflow: visible;
+}
+
+.columns {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--col-count, 1), minmax(42px, 1fr));
+  gap: 10px;
+  align-items: end;
+  height: 100%;
+  padding-bottom: var(--label-height);
+  box-sizing: border-box;
+}
+
+.column {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  height: 100%;
+}
+
+.bar-slot {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: stretch;
+  overflow: visible;
+}
+
+.bar-vertical {
+  width: 100%;
+  border-radius: 8px 8px 0 0;
+  background: var(--orange);
+  transition: height 0.2s ease;
+}
+
+.x-label {
+  font-size: clamp(0.65rem, 1.2vw, 0.8rem);
+  color: var(--gray);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.x-labels {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--col-count, 1), minmax(42px, 1fr));
+  gap: 10px;
+  align-items: end;
+  height: var(--label-height);
+}
+
+.baseline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--label-height);
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.bar-slot .tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--bar-height, 0%) + 6px);
+  transform: translate(-50%, -8px);
+  background: #fff;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  font-size: 0.75rem;
+  color: #000;
+  width: max-content;
+  max-width: 200px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 5;
+}
+
+.column:hover .tooltip {
+  opacity: 1;
+}
+
+.column .tooltip ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  color: var(--gray);
 }
 
 .pill {
