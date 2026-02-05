@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { loginUser } from '../api.js';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { supabase } from '../supabaseClient.js';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -32,8 +30,11 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const data = await loginUser({ email, password });
-      login(data);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) throw signInError;
       navigate('/');
     } catch (err) {
       setError(err.message);

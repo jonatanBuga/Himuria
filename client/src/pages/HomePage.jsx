@@ -1,5 +1,8 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { useSeasonModal } from '../contexts/SeasonModalContext.jsx';
+import useSeasonPicks from '../hooks/useSeasonPicks.js';
+import { useAuth } from '../contexts/AuthContext.jsx';
 
 const highlights = [
   { label: 'home.stats.members', value: '12' },
@@ -14,6 +17,10 @@ const nextGames = [
 
 export default function HomePage() {
   const { t } = useLanguage();
+  const { openModal } = useSeasonModal();
+  const { auth } = useAuth();
+  const { draft, committed } = useSeasonPicks(auth?.token);
+  const hasSeasonPicks = Boolean(committed?.champion_team || draft?.champion_team);
 
   return (
     <div className="page">
@@ -50,6 +57,29 @@ export default function HomePage() {
               </button>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="card">
+        <div className="card-header">
+          <div>
+            <h3>{t('home.seasonTitle')}</h3>
+            <p className="muted">{t('home.seasonSubtitle')}</p>
+          </div>
+          <span className="accent">{hasSeasonPicks ? t('home.seasonSet') : t('home.seasonUnset')}</span>
+        </div>
+        <div className="list-item season-card">
+          <div>
+            <p className="strong">{t('home.seasonChampion')}</p>
+            <p className="muted">{committed?.champion_team || draft?.champion_team || '—'}</p>
+          </div>
+          <div>
+            <p className="strong">{t('home.seasonMvp')}</p>
+            <p className="muted">{committed?.mvp_player || draft?.mvp_player || '—'}</p>
+          </div>
+          <button className="ghost" type="button" onClick={openModal}>
+            {hasSeasonPicks ? t('home.seasonEdit') : t('home.seasonSetCta')}
+          </button>
         </div>
       </section>
     </div>

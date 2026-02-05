@@ -1,25 +1,64 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { supabase } from '../supabaseClient.js';
+import { fetchProfile } from '../api.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [auth, setAuth] = useState(() => {
-    const stored = localStorage.getItem('himuria_auth');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [auth, setAuth] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = (payload) => {
-    setAuth(payload);
-    localStorage.setItem('himuria_auth', JSON.stringify(payload));
+  const hydrateAuth = async (session) => {
+    if (!session) {
+      setAuth(null);
+      setLoading(false);
+      return;
+    }
+    const token = session.access_token;
+    const email = session.user.email;
+    try {
+      const profile = await fetchProfile(token);
+      setAuth({
+        id: session.user.id,
+        email,
+        token,
+        hasSeasonPicks: profile.has_onboarded,
+        profile,
+      });
+    } catch (err) {
+      setAuth({ id: session.user.id, email, token, hasSeasonPicks: false });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const logout = () => {
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      hydrateAuth(data.session);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      hydrateAuth(session);
+    });
+
+    return () => {
+      active = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setAuth(null);
-    // Clear local storage to remove session and related cached data.
-    localStorage.clear();
   };
 
-  const value = useMemo(() => ({ auth, login, logout }), [auth]);
+  const updateAuth = (next) => {
+    setAuth(next);
+  };
+
+  const value = useMemo(() => ({ auth, logout, updateAuth, loading }), [auth, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

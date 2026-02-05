@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { registerUser } from '../api.js';
-import { useAuth } from '../contexts/AuthContext.jsx';
+import { supabase } from '../supabaseClient.js';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,8 +21,11 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
     try {
-      const data = await registerUser({ email, password });
-      login(data);
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (signUpError) throw signUpError;
       navigate('/');
     } catch (err) {
       setError(err.message);

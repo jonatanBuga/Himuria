@@ -1,67 +1,434 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { useAuth } from '../contexts/AuthContext.jsx';
+import {
+  fetchSeriesSchedule,
+  fetchSeriesDraft,
+  fetchSeriesCommitted,
+  saveSeriesDraft,
+  commitSeriesPick,
+} from '../api.js';
 
-const games = [
-  { id: 1, label: 'Celtics vs Knicks', time: 'Tonight • 7:00 PM ET' },
-  { id: 2, label: 'Nuggets vs Timberwolves', time: 'Tomorrow • 8:30 PM ET' },
+// Mock fallback series data for MVP if backend is empty.
+const fallbackSeries = [
+  {
+    series_id: 's1',
+    conference: 'EAST',
+    team_a: 'Celtics',
+    team_b: 'Knicks',
+    start_time: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
+    round: 'R2',
+    status: 'ACTIVE',
+  },
+  {
+    series_id: 's2',
+    conference: 'EAST',
+    team_a: 'Bucks',
+    team_b: '76ers',
+    start_time: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
+    round: 'R2',
+    status: 'ACTIVE',
+  },
+  {
+    series_id: 's3',
+    conference: 'WEST',
+    team_a: 'Nuggets',
+    team_b: 'Timberwolves',
+    start_time: new Date(Date.now() + 1000 * 60 * 90).toISOString(),
+    round: 'R2',
+    status: 'ACTIVE',
+  },
+  {
+    series_id: 's4',
+    conference: 'WEST',
+    team_a: 'Thunder',
+    team_b: 'Mavericks',
+    start_time: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
+    round: 'R2',
+    status: 'ACTIVE',
+  },
+  {
+    series_id: 's5',
+    conference: 'EAST',
+    team_a: 'Heat',
+    team_b: 'Cavaliers',
+    start_time: new Date(Date.now() + 1000 * 60 * 60 * 18).toISOString(),
+    round: 'R2',
+    status: 'UPCOMING',
+  },
+  {
+    series_id: 's6',
+    conference: 'WEST',
+    team_a: 'Lakers',
+    team_b: 'Suns',
+    start_time: new Date(Date.now() + 1000 * 60 * 60 * 26).toISOString(),
+    round: 'R2',
+    status: 'UPCOMING',
+  },
 ];
 
 export default function PredictPage() {
   const { t } = useLanguage();
+  const { auth } = useAuth();
+  const [filter, setFilter] = useState('EAST');
+  const [now, setNow] = useState(Date.now());
+  const [toast, setToast] = useState('');
+  const [series, setSeries] = useState([]);
+  const [drafts, setDrafts] = useState([]);
+  const [committed, setCommitted] = useState([]);
+  const committedRef = React.useRef(new Set());
+  const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(''), 1800);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!auth?.token) return;
+    let active = true;
+    Promise.all([
+      fetchSeriesSchedule(auth.token),
+      fetchSeriesDraft(auth.token),
+      fetchSeriesCommitted(auth.token),
+    ])
+      .then(([seriesData, draftData, committedData]) => {
+        if (!active) return;
+        setSeries(seriesData.length ? seriesData : fallbackSeries);
+        setDrafts(draftData || []);
+        setCommitted(committedData || []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSeries(fallbackSeries);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [auth?.token]);
+
+  useEffect(() => {
+    // Auto-commit drafts at lock time (client-side trigger).
+    if (!auth?.token || !series.length) return;
+    const timer = setInterval(async () => {
+      for (const row of series) {
+        const lockAt = new Date(row.start_time).getTime() - 60 * 1000;
+        const key = `${row.series_id}`;
+        const alreadyCommitted = committed.some((pick) => pick.series_id === row.series_id);
+        if (alreadyCommitted || committedRef.current.has(key)) continue;
+        if (Date.now() >= lockAt) {
+          const draftExists = drafts.some((pick) => pick.series_id === row.series_id);
+          if (!draftExists) {
+            committedRef.current.add(key);
+            continue;
+          }
+          try {
+            const saved = await commitSeriesPick(auth.token, row.series_id);
+            if (saved && saved.series_id) {
+              setCommitted((prev) => {
+                const filtered = prev.filter((p) => p.series_id !== saved.series_id);
+                return [...filtered, saved];
+              });
+            }
+          } finally {
+            committedRef.current.add(key);
+          }
+        }
+      }
+    }, 10000);
+
+    return () => clearInterval(timer);
+  }, [auth?.token, series, drafts, committed]);
+
+  const activeSeries = useMemo(
+    () =>
+      series.filter(
+        (item) => item.status === 'ACTIVE' && item.conference === filter
+      ),
+    [filter, series]
+  );
+  const upcomingSeries = useMemo(
+    () => series.filter((item) => item.status === 'UPCOMING'),
+    [series]
+  );
+
+  const handleSave = async (seriesRow, winsA, winsB, locked) => {
+    console.log('Save Pick clicked', {
+      series_id: seriesRow.series_id,
+      team_a: seriesRow.team_a,
+      team_b: seriesRow.team_b,
+      team_a_wins: winsA,
+      team_b_wins: winsB,
+      start_time: seriesRow.start_time,
+    });
+    console.log('Auth user id', auth?.id);
+    if (locked) return;
+    if (!auth?.token) {
+      setSaveError('No authenticated user.');
+      console.warn('No authenticated user token.');
+      return;
+    }
+    const payload = {
+      series_id: seriesRow.series_id || seriesRow.id,
+      team_a: seriesRow.team_a || seriesRow.teamA,
+      team_b: seriesRow.team_b || seriesRow.teamB,
+      team_a_wins: winsA,
+      team_b_wins: winsB,
+      start_time: seriesRow.start_time,
+    };
+    if (!payload.series_id || !payload.team_a || !payload.team_b) {
+      setSaveError('Series and team data are required.');
+      console.warn('Missing series payload fields', payload);
+      return;
+    }
+    try {
+      const saved = await saveSeriesDraft(auth.token, payload);
+      console.log('Draft upsert response', saved);
+      setDrafts((prev) => {
+        const filtered = prev.filter((item) => item.series_id !== seriesRow.series_id);
+        return [...filtered, saved];
+      });
+      setToast(t('predict.toastSaved'));
+      setSaveError('');
+    } catch (err) {
+      console.error('Draft upsert error', err);
+      setSaveError(err?.message || 'Failed to save pick.');
+    }
+  };
 
   return (
     <div className="page">
-      <section className="card">
+      <section className="card series-section">
         <div className="card-header">
-          <h3>{t('predict.title')}</h3>
-          <span className="accent">{t('predict.tag')}</span>
+          <div>
+            <h3>{t('predict.activeTitle')}</h3>
+            <p className="muted">{t('predict.activeSubtitle')}</p>
+          </div>
+          <div className="toggle-group">
+            <button
+              type="button"
+              className={`ghost toggle ${filter === 'EAST' ? 'active' : ''}`}
+              onClick={() => setFilter('EAST')}
+            >
+              {t('predict.east')}
+            </button>
+            <button
+              type="button"
+              className={`ghost toggle ${filter === 'WEST' ? 'active' : ''}`}
+              onClick={() => setFilter('WEST')}
+            >
+              {t('predict.west')}
+            </button>
+            <span className={`toggle-indicator ${filter === 'WEST' ? 'right' : ''}`} />
+          </div>
         </div>
-        <form className="form">
-          <label>
-            {t('predict.game')}
-            <select>
-              {games.map((game) => (
-                <option key={game.id} value={game.id}>
-                  {game.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t('predict.winner')}
-            <select>
-              <option>Celtics</option>
-              <option>Knicks</option>
-              <option>Nuggets</option>
-              <option>Timberwolves</option>
-            </select>
-          </label>
-          <label>
-            {t('predict.margin')}
-            <input type="number" min="1" max="30" placeholder="10" />
-          </label>
-          <label>
-            {t('predict.confidence')}
-            <input type="range" min="1" max="5" defaultValue="3" />
-          </label>
-          <button className="primary" type="button">{t('predict.save')}</button>
-        </form>
+
+        <div className="series-grid">
+          {activeSeries.map((seriesRow) => (
+            <SeriesCard
+              key={seriesRow.series_id}
+              series={seriesRow}
+              now={now}
+              t={t}
+              onSave={handleSave}
+              draft={drafts.find((pick) => pick.series_id === seriesRow.series_id)}
+              committed={committed.find((pick) => pick.series_id === seriesRow.series_id)}
+            />
+          ))}
+        </div>
+        {saveError && <p className="error">{saveError}</p>}
       </section>
 
       <section className="card">
-        <h3>{t('predict.recent')}</h3>
-        <div className="list">
-          {games.map((game) => (
-            <div key={game.id} className="list-item">
-              <div>
-                <p className="strong">{game.label}</p>
-                <p className="muted">{t('predict.sampleDetail')}</p>
-              </div>
-              <span className="pill">{t('predict.pending')}</span>
-            </div>
+        <div className="card-header">
+          <div>
+            <h3>{t('predict.upcomingTitle')}</h3>
+            <p className="muted">{t('predict.upcomingSubtitle')}</p>
+          </div>
+        </div>
+        <div className="series-grid">
+          {upcomingSeries.map((seriesRow) => (
+            <UpcomingCard key={seriesRow.series_id} series={seriesRow} now={now} t={t} />
           ))}
         </div>
       </section>
+
+      <section className="card">
+        <div className="card-header">
+          <div>
+            <h3>{t('predict.myPicks')}</h3>
+            <p className="muted">{t('predict.savedSubtitle')}</p>
+          </div>
+        </div>
+        <div className="list">
+          {drafts.length === 0 ? (
+            <p className="muted">{t('predict.emptyPicks')}</p>
+          ) : (
+            drafts.map((pick) => (
+              <div key={pick.series_id} className="list-item saved-pick">
+                <div>
+                  <p className="strong">{pick.team_a} vs {pick.team_b}</p>
+                  <p className="muted">{pick.team_a_wins} - {pick.team_b_wins}</p>
+                </div>
+                <span className="pill">{pick.updated_at ? new Date(pick.updated_at).toLocaleString() : t('predict.pending')}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
+}
+
+function SeriesCard({ series, now, t, onSave, draft, committed }) {
+  const lockAt = new Date(series.start_time).getTime() - 60 * 1000;
+  const locked = now >= lockAt || committed?.locked;
+
+  const initialWinsA = committed?.team_a_wins ?? draft?.team_a_wins ?? 4;
+  const initialWinsB = committed?.team_b_wins ?? draft?.team_b_wins ?? 2;
+  const [winsA, setWinsA] = useState(initialWinsA);
+  const [winsB, setWinsB] = useState(initialWinsB);
+
+  useEffect(() => {
+    setWinsA(initialWinsA);
+    setWinsB(initialWinsB);
+  }, [initialWinsA, initialWinsB]);
+
+  const isValid = useMemo(() => {
+    // Valid series outcome: one team reaches 4 wins, the other is 0-3.
+    const a = Number(winsA);
+    const b = Number(winsB);
+    return (a === 4 && b <= 3) || (b === 4 && a <= 3);
+  }, [winsA, winsB]);
+
+  const handleInput = (setter) => (event) => {
+    const value = event.target.value === '' ? '' : Number(event.target.value);
+    if (value === '' || (Number.isInteger(value) && value >= 0 && value <= 4)) {
+      setter(value);
+    }
+  };
+
+  return (
+    <article className={`series-card ${locked ? 'is-locked' : ''}`}>
+      <div className="series-meta">
+        <div className="lock">
+          <span className="clock" aria-hidden="true" />
+          {locked ? t('predict.locked') : `${t('predict.locksIn')}: ${formatCountdown(lockAt, now)}`}
+        </div>
+      </div>
+      <div className="series-body">
+        <div className="series-side">
+          <div className="team-block">
+            <div className="logo" aria-hidden="true">{series.team_a?.slice(0, 3).toUpperCase()}</div>
+            <p className="strong">{series.team_a}</p>
+          </div>
+          <div className="wins-block">
+            <input
+              type="number"
+              min="0"
+              max="4"
+              step="1"
+              value={winsA}
+              onChange={handleInput(setWinsA)}
+              disabled={locked}
+              aria-label={`${series.team_a} wins`}
+            />
+            <span className="wins-label">{t('predict.winsLabel')}</span>
+          </div>
+        </div>
+        <div className="score-block">
+          <span className="dash">-</span>
+          <p className="helper">{t('predict.helper')}</p>
+        </div>
+        <div className="series-side">
+          <div className="team-block">
+            <div className="logo" aria-hidden="true">{series.team_b?.slice(0, 3).toUpperCase()}</div>
+            <p className="strong">{series.team_b}</p>
+          </div>
+          <div className="wins-block">
+            <input
+              type="number"
+              min="0"
+              max="4"
+              step="1"
+              value={winsB}
+              onChange={handleInput(setWinsB)}
+              disabled={locked}
+              aria-label={`${series.team_b} wins`}
+            />
+            <span className="wins-label">{t('predict.winsLabel')}</span>
+          </div>
+        </div>
+      </div>
+      <button
+        className="primary full"
+        type="button"
+        disabled={!isValid || locked}
+        onClick={() => onSave(series, Number(winsA), Number(winsB), locked)}
+      >
+        {t('predict.save')}
+      </button>
+    </article>
+  );
+}
+
+function UpcomingCard({ series, now, t }) {
+  const opensAt = new Date(series.start_time).getTime();
+  return (
+    <article className="series-card is-upcoming">
+      <div className="series-meta">
+        <div className="lock">
+          <span className="clock" aria-hidden="true" />
+          {t('predict.opensIn')}: {formatCountdown(opensAt, now)}
+        </div>
+      </div>
+      <div className="series-body">
+        <div className="series-side">
+          <div className="team-block">
+            <div className="logo" aria-hidden="true">{series.team_a?.slice(0, 3).toUpperCase()}</div>
+            <p className="strong">{series.team_a}</p>
+          </div>
+          <div className="wins-block muted">
+            <span className="wins-label">{t('predict.notOpenYet')}</span>
+          </div>
+        </div>
+        <div className="score-block muted">
+          <span className="dash">-</span>
+        </div>
+        <div className="series-side">
+          <div className="team-block">
+            <div className="logo" aria-hidden="true">{series.team_b?.slice(0, 3).toUpperCase()}</div>
+            <p className="strong">{series.team_b}</p>
+          </div>
+          <div className="wins-block muted">
+            <span className="wins-label">{t('predict.notOpenYet')}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function formatCountdown(target, now) {
+  const diff = Math.max(0, target - now);
+  const totalSeconds = Math.floor(diff / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) {
+    return `${days}d ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+  }
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(
+    seconds
+  ).padStart(2, '0')}`;
 }

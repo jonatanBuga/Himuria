@@ -2,15 +2,43 @@ import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
+import { SeasonModalProvider, useSeasonModal } from '../contexts/SeasonModalContext.jsx';
+import SeasonOnboardingModal from './SeasonOnboardingModal.jsx';
+import useSeasonPicks from '../hooks/useSeasonPicks.js';
+import { saveSeasonDraft } from '../api.js';
+import { supabase } from '../supabaseClient.js';
 
 export default function AppShell() {
-  const { logout } = useAuth();
+  return (
+    <SeasonModalProvider>
+      <AppShellInner />
+    </SeasonModalProvider>
+  );
+}
+
+function AppShellInner() {
+  const { auth, logout, updateAuth } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
+  const { draft, setDraft } = useSeasonPicks(auth?.token);
+  const { open, setOpen } = useSeasonModal();
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleSeasonSubmit = async (payload) => {
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data.session?.user) {
+      throw new Error('No authenticated user found.');
+    }
+    const token = data.session.access_token;
+    const saved = await saveSeasonDraft(token, payload);
+    setDraft(saved);
+    updateAuth({ ...auth, hasSeasonPicks: true });
+    setOpen(false);
+    navigate('/');
   };
 
   return (
@@ -46,11 +74,11 @@ export default function AppShell() {
         </div>
       </header>
 
-      <main className="content">
+      <main className={`content ${open ? 'blurred' : ''}`} aria-hidden={open}>
         <Outlet />
       </main>
 
-      <nav className="bottom-nav">
+      <nav className={`bottom-nav ${open ? 'disabled' : ''}`}>
         <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
           <span className="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -86,6 +114,8 @@ export default function AppShell() {
           <span>{t('nav.profile')}</span>
         </NavLink>
       </nav>
+
+      {open && <SeasonOnboardingModal onSubmit={handleSeasonSubmit} />}
     </div>
   );
 }

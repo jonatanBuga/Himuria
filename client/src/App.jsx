@@ -11,7 +11,10 @@ import ProfilePage from './pages/ProfilePage.jsx';
 import AppShell from './components/AppShell.jsx';
 
 function PrivateRoute({ children }) {
-  const { auth } = useAuth();
+  const { auth, loading } = useAuth();
+  if (loading) {
+    return null;
+  }
   if (!auth) {
     return <Navigate to="/login" replace />;
   }
@@ -19,7 +22,10 @@ function PrivateRoute({ children }) {
 }
 
 function PublicOnly({ children }) {
-  const { auth } = useAuth();
+  const { auth, loading } = useAuth();
+  if (loading) {
+    return null;
+  }
   if (auth) {
     return <Navigate to="/" replace />;
   }
