@@ -23,7 +23,13 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://himuria.vercel.app"
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 const jwksUrl = SUPABASE_URL
