@@ -10,7 +10,7 @@ import {
 } from '../api.js';
 import { supabase } from '../supabaseClient.js';
 import useSeriesPicks from '../hooks/useSeriesPicks.js';
-import SeriesPickCard from '../components/SeriesPickCard.jsx';
+import SeriesPickCard, { TeamLogo } from '../components/SeriesPickCard.jsx';
 import { getSeriesPayload, isValidSeriesWins, saveDraftPick } from '../seriesPickUtils.js';
 
 // Mock fallback series data for MVP if backend is empty.
@@ -78,6 +78,7 @@ export default function PredictPage() {
   const [now, setNow] = useState(Date.now());
   const [toast, setToast] = useState('');
   const [series, setSeries] = useState([]);
+  const [teamLogoMap, setTeamLogoMap] = useState({});
   const { drafts, committed, setDrafts, setCommitted, error: picksError } = useSeriesPicks(auth?.token);
   const committedRef = React.useRef(new Set());
   const [saveError, setSaveError] = useState('');
@@ -122,6 +123,33 @@ export default function PredictPage() {
       active = false;
     };
   }, [auth?.token]);
+
+  useEffect(() => {
+    let active = true;
+    const loadTeams = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('nba_teams')
+          .select('team_name, image_url');
+        if (error) throw error;
+        if (!active) return;
+        const nextMap = {};
+        data.forEach((row) => {
+          if (row.team_name && row.image_url) {
+            nextMap[row.team_name.toLowerCase()] = row.image_url;
+          }
+        });
+        setTeamLogoMap(nextMap);
+      } catch (err) {
+        if (!active) return;
+        console.warn('Failed to load team logos', err);
+      }
+    };
+    loadTeams();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Auto-commit drafts at lock time (client-side trigger).
@@ -249,6 +277,7 @@ export default function PredictPage() {
               onSave={handleSave}
               draft={drafts.find((pick) => pick.series_id === seriesRow.series_id)}
               committed={committed.find((pick) => pick.series_id === seriesRow.series_id)}
+              teamLogoMap={teamLogoMap}
             />
           ))}
         </div>
@@ -266,7 +295,13 @@ export default function PredictPage() {
         </div>
         <div className="series-grid">
           {upcomingSeries.map((seriesRow) => (
-            <UpcomingCard key={seriesRow.series_id} series={seriesRow} now={now} t={t} />
+            <UpcomingCard
+              key={seriesRow.series_id}
+              series={seriesRow}
+              now={now}
+              t={t}
+              teamLogoMap={teamLogoMap}
+            />
           ))}
         </div>
       </section>
@@ -300,7 +335,7 @@ export default function PredictPage() {
   );
 }
 
-function UpcomingCard({ series, now, t }) {
+function UpcomingCard({ series, now, t, teamLogoMap }) {
   const opensAt = new Date(series.start_time).getTime();
   return (
     <article className="series-card is-upcoming">
@@ -311,26 +346,22 @@ function UpcomingCard({ series, now, t }) {
         </div>
       </div>
       <div className="series-body">
-        <div className="series-side">
-          <div className="team-block">
-            <div className="logo" aria-hidden="true">{series.team_a?.slice(0, 3).toUpperCase()}</div>
-            <p className="strong">{series.team_a}</p>
-          </div>
-          <div className="wins-block muted">
+        <div className="team-side">
+          <TeamLogo name={series.team_a} teamLogoMap={teamLogoMap} />
+          <p className="strong team-name">{series.team_a}</p>
+        </div>
+        <div className="score-center muted">
+          <div className="wins-inline muted">
             <span className="wins-label">{t('predict.notOpenYet')}</span>
           </div>
-        </div>
-        <div className="score-block muted">
           <span className="dash">-</span>
-        </div>
-        <div className="series-side">
-          <div className="team-block">
-            <div className="logo" aria-hidden="true">{series.team_b?.slice(0, 3).toUpperCase()}</div>
-            <p className="strong">{series.team_b}</p>
-          </div>
-          <div className="wins-block muted">
+          <div className="wins-inline muted">
             <span className="wins-label">{t('predict.notOpenYet')}</span>
           </div>
+        </div>
+        <div className="team-side right">
+          <TeamLogo name={series.team_b} teamLogoMap={teamLogoMap} />
+          <p className="strong team-name">{series.team_b}</p>
         </div>
       </div>
     </article>

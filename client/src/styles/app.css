@@ -230,7 +230,9 @@ h3 {
 
 .series-meta {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
 .lock {
@@ -267,42 +269,51 @@ h3 {
   gap: 12px;
 }
 
-.series-side {
-  display: grid;
-  gap: 12px;
-  justify-items: center;
-  text-align: center;
-}
-
-.team-block {
+.team-side {
   display: grid;
   gap: 8px;
+  align-items: center;
   justify-items: center;
   text-align: center;
 }
 
-.logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
-  border: 1px solid var(--stroke);
+.team-side.right {
+  text-align: center;
+  justify-items: center;
+}
+
+.team-name {
+  font-size: 0.95rem;
+}
+
+.logo-slot {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.02);
   display: grid;
   place-items: center;
-  font-weight: 600;
-  font-size: 0.8rem;
-  background: rgba(0, 0, 0, 0.03);
+  overflow: hidden;
 }
 
-.wins-block {
+.logo-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.wins-inline {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   justify-items: center;
 }
 
-.wins-block input {
-  width: 64px;
+.wins-inline input {
+  width: 56px;
   text-align: center;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
 .wins-label {
@@ -310,11 +321,23 @@ h3 {
   color: var(--gray);
 }
 
-.score-block {
+.score-center {
   display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-width: 120px;
+}
+
+.vs-block {
+  display: grid;
   justify-items: center;
-  min-width: 40px;
+  min-width: 28px;
+}
+
+.series-body .team-side .team-name {
+  text-align: center;
 }
 
 .dash {
@@ -322,15 +345,98 @@ h3 {
   font-size: 1.2rem;
 }
 
-.helper {
+.info-wrapper {
+  position: relative;
+}
+
+.info-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--stroke);
+  background: #fff;
+  color: #000;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: grid;
+  place-items: center;
+}
+
+.info-popover {
+  position: absolute;
+  top: 34px;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
   font-size: 0.75rem;
   color: var(--gray);
-  text-align: center;
-  max-width: 140px;
+  max-width: 180px;
+  z-index: 5;
 }
 
 .full {
   width: 100%;
+}
+
+@media (max-width: 768px) {
+  .series-grid {
+    display: flex;
+    overflow-x: auto;
+    gap: 16px;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 4px;
+  }
+
+  .series-grid > * {
+    flex: 0 0 calc(100% - 8px);
+    scroll-snap-align: center;
+  }
+
+  .series-card {
+    min-height: 220px;
+  }
+
+  .series-body {
+    align-items: center;
+  }
+
+  .team-side {
+    align-items: center;
+    justify-items: center;
+    gap: 8px;
+  }
+
+  .team-row {
+    width: 100%;
+    gap: 8px;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .team-side.right .team-row {
+    flex-direction: row-reverse;
+  }
+
+  .team-name {
+    text-align: left;
+  }
+
+  .team-side.right .team-name {
+    text-align: right;
+  }
+
+  .wins-inline {
+    justify-items: center;
+    min-width: 60px;
+  }
+
+  .logo-slot {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 .toast {

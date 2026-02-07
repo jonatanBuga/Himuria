@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getLockTime, isValidSeriesWins } from '../seriesPickUtils.js';
 
 export default function SeriesPickCard({
@@ -8,6 +8,7 @@ export default function SeriesPickCard({
   onSave,
   draft,
   committed,
+  teamLogoMap,
 }) {
   const lockAt = getLockTime(series);
   const locked = now >= lockAt || committed?.locked;
@@ -16,11 +17,28 @@ export default function SeriesPickCard({
   const initialWinsB = committed?.team_b_wins ?? draft?.team_b_wins ?? 2;
   const [winsA, setWinsA] = useState(initialWinsA);
   const [winsB, setWinsB] = useState(initialWinsB);
+  const [showInfo, setShowInfo] = useState(false);
+  const infoRef = useRef(null);
 
   useEffect(() => {
     setWinsA(initialWinsA);
     setWinsB(initialWinsB);
   }, [initialWinsA, initialWinsB]);
+
+  useEffect(() => {
+    if (!showInfo) return undefined;
+    const handleOutside = (event) => {
+      if (infoRef.current && !infoRef.current.contains(event.target)) {
+        setShowInfo(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [showInfo]);
 
   const isValid = useMemo(() => isValidSeriesWins(winsA, winsB), [winsA, winsB]);
 
@@ -38,14 +56,32 @@ export default function SeriesPickCard({
           <span className="clock" aria-hidden="true" />
           {locked ? t('predict.locked') : `${t('predict.locksIn')}: ${formatCountdown(lockAt, now)}`}
         </div>
+        <div className="info-wrapper" ref={infoRef}>
+          <button
+            type="button"
+            className="info-btn"
+            aria-label={t('predict.helper')}
+            onClick={(event) => {
+              event.stopPropagation();
+              setShowInfo((prev) => !prev);
+            }}
+          >
+            i
+          </button>
+          {showInfo && (
+            <div className="info-popover">
+              {t('predict.helper')}
+            </div>
+          )}
+        </div>
       </div>
       <div className="series-body">
-        <div className="series-side">
-          <div className="team-block">
-            <div className="logo" aria-hidden="true">{series.team_a?.slice(0, 3).toUpperCase()}</div>
-            <p className="strong">{series.team_a}</p>
-          </div>
-          <div className="wins-block">
+        <div className="team-side">
+          <TeamLogo name={series.team_a} teamLogoMap={teamLogoMap} />
+          <p className="strong team-name">{series.team_a}</p>
+        </div>
+        <div className="score-center">
+          <div className="wins-inline">
             <input
               type="number"
               min="0"
@@ -58,17 +94,8 @@ export default function SeriesPickCard({
             />
             <span className="wins-label">{t('predict.winsLabel')}</span>
           </div>
-        </div>
-        <div className="score-block">
           <span className="dash">-</span>
-          <p className="helper">{t('predict.helper')}</p>
-        </div>
-        <div className="series-side">
-          <div className="team-block">
-            <div className="logo" aria-hidden="true">{series.team_b?.slice(0, 3).toUpperCase()}</div>
-            <p className="strong">{series.team_b}</p>
-          </div>
-          <div className="wins-block">
+          <div className="wins-inline">
             <input
               type="number"
               min="0"
@@ -82,6 +109,10 @@ export default function SeriesPickCard({
             <span className="wins-label">{t('predict.winsLabel')}</span>
           </div>
         </div>
+        <div className="team-side right">
+          <TeamLogo name={series.team_b} teamLogoMap={teamLogoMap} />
+          <p className="strong team-name">{series.team_b}</p>
+        </div>
       </div>
       <button
         className="primary full"
@@ -92,6 +123,23 @@ export default function SeriesPickCard({
         {t('predict.save')}
       </button>
     </article>
+  );
+}
+
+function normalizeTeamName(name = '') {
+  const trimmed = String(name).trim().toLowerCase();
+  if (!trimmed) return '';
+  const parts = trimmed.split(/\s+/);
+  return parts[parts.length - 1];
+}
+
+export function TeamLogo({ name, teamLogoMap }) {
+  const key = normalizeTeamName(name);
+  const url = teamLogoMap?.[key];
+  return (
+    <div className="logo-slot" aria-hidden="true">
+      {url ? <img src={url} alt="" loading="lazy" /> : null}
+    </div>
   );
 }
 
