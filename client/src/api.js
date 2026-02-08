@@ -107,3 +107,11 @@ export async function fetchRoundAnalytics(token) {
     },
   });
 }
+
+export async function fetchLeaderboard(token) {
+  return request('/leaderboard', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}

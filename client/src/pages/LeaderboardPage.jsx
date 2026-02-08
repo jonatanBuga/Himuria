@@ -1,51 +1,44 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
-
-const leaderboardRows = [
-  {
-    userId: 'u1',
-    username: 'Jordan',
-    correctCount: 12,
-    exactCount: 3,
-    wrongCount: 5,
-    championPick: 'Celtics',
-    points: 92,
-  },
-  {
-    userId: 'u2',
-    username: 'Alex',
-    correctCount: 10,
-    exactCount: 4,
-    wrongCount: 6,
-    championPick: 'Nuggets',
-    points: 88,
-  },
-  {
-    userId: 'u3',
-    username: 'Sam',
-    correctCount: 9,
-    exactCount: 1,
-    wrongCount: 9,
-    championPick: 'Thunder',
-    points: 80,
-  },
-  {
-    userId: 'u4',
-    username: 'Casey',
-    correctCount: 8,
-    exactCount: 2,
-    wrongCount: 10,
-    championPick: 'Timberwolves',
-    points: 74,
-  },
-];
+import { useAuth } from '../contexts/AuthContext.jsx';
+import { fetchLeaderboard } from '../api.js';
+import { supabase } from '../supabaseClient.js';
 
 export default function LeaderboardPage() {
   const { t } = useLanguage();
-  // Future: hook scoring + sorting from backend without changing row structure.
-  // Sorting intentionally disabled for now to preserve backend insertion order.
-  const maxExact = Math.max(...leaderboardRows.map((row) => row.exactCount));
-  const maxWrong = Math.max(...leaderboardRows.map((row) => row.wrongCount));
+  const { auth } = useAuth();
+  const [rows, setRows] = useState([]);
+  const [error, setError] = useState('');
+
+  const getToken = async () => {
+    if (auth?.token) return auth.token;
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token;
+  };
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const data = await fetchLeaderboard(token);
+        if (!active) return;
+        setRows(data || []);
+        setError('');
+      } catch (err) {
+        if (!active) return;
+        setError(err?.message || 'Failed to load leaderboard.');
+      }
+    };
+    load();
+    return () => {
+      active = false;
+    };
+  }, [auth?.token]);
+
+  const maxExact = useMemo(() => Math.max(0, ...rows.map((row) => row.exact || 0)), [rows]);
+  const maxWrong = useMemo(() => Math.max(0, ...rows.map((row) => row.wrong || 0)), [rows]);
 
   return (
     <div className="page">
@@ -64,27 +57,28 @@ export default function LeaderboardPage() {
               <div className="table-cell" role="columnheader">{t('leaderboard.columns.champion')}</div>
               <div className="table-cell" role="columnheader">{t('leaderboard.columns.points')}</div>
             </div>
-            {leaderboardRows.map((row) => {
-              const highlightBest = row.exactCount === maxExact && maxExact > 0;
-              const highlightWorst = row.wrongCount === maxWrong && maxWrong > 0;
+            {rows.map((row) => {
+              const highlightBest = row.exact === maxExact && maxExact > 0;
+              const highlightWorst = row.wrong === maxWrong && maxWrong > 0;
               const rowClass = highlightBest
                 ? 'table-row highlight-best'
                 : highlightWorst
                   ? 'table-row highlight-worst'
                   : 'table-row';
               return (
-                <div key={row.userId} className={rowClass} role="row">
+                <div key={row.user_id} className={rowClass} role="row">
                   <div className="table-cell sticky strong" role="cell">{row.username}</div>
-                  <div className="table-cell" role="cell">{row.correctCount}</div>
-                  <div className="table-cell" role="cell">{row.exactCount}</div>
-                  <div className="table-cell" role="cell">{row.wrongCount}</div>
-                  <div className="table-cell" role="cell">{row.championPick}</div>
-                  <div className="table-cell strong" role="cell">{row.points}</div>
+                  <div className="table-cell" role="cell">{row.correct}</div>
+                  <div className="table-cell" role="cell">{row.exact}</div>
+                  <div className="table-cell" role="cell">{row.wrong}</div>
+                  <div className="table-cell" role="cell">{row.champion_team || '—'}</div>
+                  <div className="table-cell strong" role="cell">{row.total_points}</div>
                 </div>
               );
             })}
           </div>
         </div>
+        {error && <p className="error">{error}</p>}
       </section>
     </div>
   );

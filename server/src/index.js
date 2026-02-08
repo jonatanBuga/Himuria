@@ -83,6 +83,19 @@ function isValidSeriesWins(teamAWins, teamBWins) {
   return (a === 4 && b <= 3) || (b === 4 && a <= 3);
 }
 
+function calculateTotalPoints(_row) {
+  // Scoring scaffold for future implementation.
+  // Regional Quarterfinals: Winner 10, Exact 13
+  // Regional Semifinals: Winner 15, Exact 19
+  // Regional Finals: Winner 20, Exact 25
+  // NBA Finals: Winner 25, Exact 33
+  // Champion Pick: +40
+  // MVP: +10
+  // Most Exact Results: +20
+  // Most Incorrect Predictions: -20
+  return 0;
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
@@ -97,12 +110,16 @@ app.get('/api/profile/me', requireAuth, async (req, res) => {
 
   if (error) return res.status(400).json({ error: error.message });
 
+  const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(req.user.id);
+  const metaUsername = authUser?.user?.user_metadata?.username || null;
+
   if (!data) {
     const { data: created, error: createError } = await supabaseAdmin
       .from('profiles')
       .insert({
         id: req.user.id,
         email: req.user.email || null,
+        username: metaUsername,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -110,6 +127,17 @@ app.get('/api/profile/me', requireAuth, async (req, res) => {
       .single();
     if (createError) return res.status(400).json({ error: createError.message });
     return res.json(created);
+  }
+
+  if (!data.username && metaUsername) {
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('profiles')
+      .update({ username: metaUsername, updated_at: new Date().toISOString() })
+      .eq('id', req.user.id)
+      .select('*')
+      .single();
+    if (updateError) return res.status(400).json({ error: updateError.message });
+    return res.json(updated);
   }
 
   return res.json(data);
@@ -376,6 +404,76 @@ app.get('/api/analytics/round', requireAuth, async (req, res) => {
     east: eastTeams,
     west: westTeams,
   });
+});
+
+app.get('/api/leaderboard', requireAuth, async (_req, res) => {
+  let { data: players, error } = await supabaseAdmin
+    .from('leaderboard_players')
+    .select('*');
+  if (error) return res.status(400).json({ error: error.message });
+
+  // Backfill leaderboard rows for confirmed users if missing.
+  if (!players || players.length === 0) {
+    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    if (usersError) return res.status(400).json({ error: usersError.message });
+
+    const confirmedUsers = (usersData?.users || []).filter((u) => u.email_confirmed_at);
+    const confirmedIds = confirmedUsers.map((u) => u.id);
+    if (confirmedIds.length) {
+      const { data: profiles, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id,username,email')
+        .in('id', confirmedIds);
+      if (profilesError) return res.status(400).json({ error: profilesError.message });
+
+      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+      const payload = confirmedUsers.map((user) => {
+        const profile = profileMap.get(user.id);
+        const baseEmail = profile?.email || user.email || '';
+        const fallbackName = baseEmail ? baseEmail.split('@')[0] : `user_${user.id.slice(0, 6)}`;
+        return {
+          user_id: user.id,
+          username: profile?.username || fallbackName,
+        };
+      });
+
+      if (payload.length) {
+        await supabaseAdmin.from('leaderboard_players').upsert(payload, { onConflict: 'user_id' });
+      }
+    }
+
+    const refreshed = await supabaseAdmin.from('leaderboard_players').select('*');
+    players = refreshed.data || [];
+  }
+
+  const userIds = (players || []).map((row) => row.user_id).filter(Boolean);
+  const { data: seasonDrafts, error: draftError } = await supabaseAdmin
+    .from('season_picks_draft')
+    .select('user_id, champion_team')
+    .in('user_id', userIds);
+  if (draftError) return res.status(400).json({ error: draftError.message });
+
+  const championMap = new Map((seasonDrafts || []).map((row) => [row.user_id, row.champion_team]));
+
+  const payload = (players || []).map((row) => ({
+    user_id: row.user_id,
+    username: row.username,
+    correct: row.correct || 0,
+    exact: row.exact || 0,
+    wrong: row.wrong || 0,
+    champion_team: championMap.get(row.user_id) || null,
+    total_points: calculateTotalPoints(row),
+  }));
+
+  payload.sort((a, b) => {
+    if (b.total_points !== a.total_points) return b.total_points - a.total_points;
+    return (a.username || '').localeCompare(b.username || '');
+  });
+
+  return res.json(payload);
 });
 
 app.post('/api/admin/series/upsert', requireAuth, requireAdmin, async (req, res) => {
