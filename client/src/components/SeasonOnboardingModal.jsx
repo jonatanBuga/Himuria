@@ -2,26 +2,46 @@ import React, { useMemo, useState } from 'react';
 import { rulesContent } from '../rules.js';
 import { useLanguage } from '../contexts/LanguageContext.jsx';
 
+// 2026 NBA Playoffs teams (16 teams; TBD = play-in winner not yet determined)
 const teams = [
+  // Eastern Conference
+  'Pistons',
   'Celtics',
   'Knicks',
-  'Bucks',
+  'Cavaliers',
+  'Raptors',
+  'Hawks',
   '76ers',
-  'Nuggets',
-  'Timberwolves',
+  'TBD (East 8)',
+  // Western Conference
   'Thunder',
-  'Mavericks',
+  'Spurs',
+  'Nuggets',
+  'Lakers',
+  'Rockets',
+  'Timberwolves',
+  'Blazers',
+  'TBD (West 8)',
 ];
 
+// Finals MVP candidates from the 2026 playoff field
 const players = [
-  'Jayson Tatum',
-  'Jalen Brunson',
-  'Giannis Antetokounmpo',
-  'Joel Embiid',
-  'Nikola Jokic',
-  'Anthony Edwards',
   'Shai Gilgeous-Alexander',
-  'Luka Doncic',
+  'Nikola Jokic',
+  'Jayson Tatum',
+  'Jaylen Brown',
+  'Victor Wembanyama',
+  'LeBron James',
+  'Anthony Davis',
+  'Jalen Brunson',
+  'Karl-Anthony Towns',
+  'Anthony Edwards',
+  'Donovan Mitchell',
+  'Cade Cunningham',
+  'Joel Embiid',
+  'Trae Young',
+  'Alperen Sengun',
+  'Scottie Barnes',
 ];
 
 export default function SeasonOnboardingModal({ onSubmit }) {

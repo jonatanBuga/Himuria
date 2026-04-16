@@ -20,7 +20,8 @@ export function isValidSeriesWins(winsA, winsB) {
 }
 
 export function getLockTime(seriesRow) {
-  return new Date(seriesRow.start_time).getTime() - 60 * 1000;
+  // Betting closes at series start time (Game 1 tip-off).
+  return new Date(seriesRow.start_time).getTime();
 }
 
 export async function saveDraftPick(token, seriesRow, winsA, winsB) {

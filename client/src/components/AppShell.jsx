@@ -104,6 +104,24 @@ function AppShellInner() {
           </span>
           <span>{t('nav.leaderboard')}</span>
         </NavLink>
+        <NavLink to="/bracket" className={({ isActive }) => (isActive ? 'active' : '')}>
+          <span className="icon">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="2" y="4" width="6" height="4" rx="1" fill="currentColor" />
+              <rect x="2" y="10" width="6" height="4" rx="1" fill="currentColor" />
+              <rect x="2" y="16" width="6" height="4" rx="1" fill="currentColor" />
+              <rect x="10" y="7" width="6" height="4" rx="1" fill="currentColor" />
+              <rect x="10" y="13" width="6" height="4" rx="1" fill="currentColor" />
+              <rect x="18" y="10" width="4" height="4" rx="1" fill="currentColor" />
+              <line x1="8" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="8" y1="12" x2="10" y2="12" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="8" y1="18" x2="10" y2="18" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="16" y1="9" x2="18" y2="12" stroke="currentColor" strokeWidth="1.5" />
+              <line x1="16" y1="15" x2="18" y2="12" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+          </span>
+          <span>{t('nav.bracket')}</span>
+        </NavLink>
         <NavLink to="/profile" className={({ isActive }) => (isActive ? 'active' : '')}>
           <span className="icon">
             <svg viewBox="0 0 24 24" aria-hidden="true">

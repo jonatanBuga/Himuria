@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/jonatanbuga/Desktop/Himuria -type f \\\\\\( -name \"*.json\" \\\\\\) ! -path \"*/node_modules/*\" ! -path \"*/.git/*\" 2>/dev/null | head -20)",
+      "WebSearch",
+      "Bash(cat /Users/jonatanbuga/Desktop/Himuria/supabase/migrations/*.sql | grep -A 5 -B 5 \"nba_teams\\\\|CREATE TABLE\")",
+      "WebFetch(domain:africa.espn.com)",
+      "Bash(node -e \"\nimport dotenv from 'dotenv';\nimport { createClient } from '@supabase/supabase-js';\ndotenv.config\\(\\);\nconst sb = createClient\\(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }\\);\nconst r = await sb.from\\('nba_teams'\\).select\\('*'\\).limit\\(5\\);\nconsole.log\\('rows:', JSON.stringify\\(r.data\\)\\);\nconsole.log\\('err:', r.error?.message\\);\n\" --input-type module 2>&1)",
+      "Bash(node scripts/seed-series.js)"
+    ]
+  }
+}

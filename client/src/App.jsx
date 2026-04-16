@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage.jsx';
 import PredictPage from './pages/PredictPage.jsx';
 import LeaderboardPage from './pages/LeaderboardPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
+import BracketPage from './pages/BracketPage.jsx';
 import AppShell from './components/AppShell.jsx';
 
 function PrivateRoute({ children }) {
@@ -64,6 +65,7 @@ export default function App() {
             <Route index element={<HomePage />} />
             <Route path="predict" element={<PredictPage />} />
             <Route path="leaderboard" element={<LeaderboardPage />} />
+            <Route path="bracket" element={<BracketPage />} />
             <Route path="profile" element={<ProfilePage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

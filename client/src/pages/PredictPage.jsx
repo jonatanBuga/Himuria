@@ -13,60 +13,81 @@ import useSeriesPicks from '../hooks/useSeriesPicks.js';
 import SeriesPickCard, { TeamLogo } from '../components/SeriesPickCard.jsx';
 import { getSeriesPayload, isValidSeriesWins, saveDraftPick } from '../seriesPickUtils.js';
 
-// Mock fallback series data for MVP if backend is empty.
+// Fallback series data — 2026 NBA Playoffs First Round.
+// Used only if backend returns empty. TBD = play-in winner not yet determined.
 const fallbackSeries = [
+  // Eastern Conference Round 1
   {
-    series_id: 's1',
+    series_id: 'east-r1-1v8',
     conference: 'EAST',
-    team_a: 'Celtics',
-    team_b: 'Knicks',
-    start_time: new Date(Date.now() + 1000 * 60 * 60 * 2).toISOString(),
-    round: 'R2',
-    status: 'ACTIVE',
-  },
-  {
-    series_id: 's2',
-    conference: 'EAST',
-    team_a: 'Bucks',
-    team_b: '76ers',
-    start_time: new Date(Date.now() + 1000 * 60 * 45).toISOString(),
-    round: 'R2',
-    status: 'ACTIVE',
-  },
-  {
-    series_id: 's3',
-    conference: 'WEST',
-    team_a: 'Nuggets',
-    team_b: 'Timberwolves',
-    start_time: new Date(Date.now() + 1000 * 60 * 90).toISOString(),
-    round: 'R2',
-    status: 'ACTIVE',
-  },
-  {
-    series_id: 's4',
-    conference: 'WEST',
-    team_a: 'Thunder',
-    team_b: 'Mavericks',
-    start_time: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
-    round: 'R2',
-    status: 'ACTIVE',
-  },
-  {
-    series_id: 's5',
-    conference: 'EAST',
-    team_a: 'Heat',
-    team_b: 'Cavaliers',
-    start_time: new Date(Date.now() + 1000 * 60 * 60 * 18).toISOString(),
-    round: 'R2',
+    team_a: 'Pistons',
+    team_b: 'TBD',
+    start_time: '2026-04-21T21:00:00Z',
+    round: 'R1',
     status: 'UPCOMING',
   },
   {
-    series_id: 's6',
+    series_id: 'east-r1-2v7',
+    conference: 'EAST',
+    team_a: 'Celtics',
+    team_b: '76ers',
+    start_time: '2026-04-19T19:30:00Z',
+    round: 'R1',
+    status: 'UPCOMING',
+  },
+  {
+    series_id: 'east-r1-3v6',
+    conference: 'EAST',
+    team_a: 'Knicks',
+    team_b: 'Hawks',
+    start_time: '2026-04-20T17:00:00Z',
+    round: 'R1',
+    status: 'UPCOMING',
+  },
+  {
+    series_id: 'east-r1-4v5',
+    conference: 'EAST',
+    team_a: 'Cavaliers',
+    team_b: 'Raptors',
+    start_time: '2026-04-19T17:00:00Z',
+    round: 'R1',
+    status: 'UPCOMING',
+  },
+  // Western Conference Round 1
+  {
+    series_id: 'west-r1-1v8',
+    conference: 'WEST',
+    team_a: 'Thunder',
+    team_b: 'TBD',
+    start_time: '2026-04-21T23:30:00Z',
+    round: 'R1',
+    status: 'UPCOMING',
+  },
+  {
+    series_id: 'west-r1-2v7',
+    conference: 'WEST',
+    team_a: 'Spurs',
+    team_b: 'Blazers',
+    start_time: '2026-04-20T22:00:00Z',
+    round: 'R1',
+    status: 'UPCOMING',
+  },
+  {
+    series_id: 'west-r1-3v6',
+    conference: 'WEST',
+    team_a: 'Nuggets',
+    team_b: 'Timberwolves',
+    start_time: '2026-04-19T22:00:00Z',
+    round: 'R1',
+    status: 'UPCOMING',
+  },
+  {
+    series_id: 'west-r1-4v5',
     conference: 'WEST',
     team_a: 'Lakers',
-    team_b: 'Suns',
-    start_time: new Date(Date.now() + 1000 * 60 * 60 * 26).toISOString(),
-    round: 'R2',
+    team_b: 'Rockets',
+    start_time: '2026-04-20T19:30:00Z',
+    round: 'R1',
     status: 'UPCOMING',
   },
 ];
@@ -158,7 +179,7 @@ export default function PredictPage() {
       const token = await getToken();
       if (!token) return;
       for (const row of series) {
-        const lockAt = new Date(row.start_time).getTime() - 60 * 1000;
+        const lockAt = new Date(row.start_time).getTime();
         const key = `${row.series_id}`;
         const alreadyCommitted = committed.some((pick) => pick.series_id === row.series_id);
         if (alreadyCommitted || committedRef.current.has(key)) continue;
@@ -186,15 +207,21 @@ export default function PredictPage() {
     return () => clearInterval(timer);
   }, [series, drafts, committed]);
 
-  const activeSeries = useMemo(
+  // All non-TBD series for current conference — betting open until start_time.
+  const bettableSeries = useMemo(
     () =>
       series.filter(
-        (item) => item.status === 'ACTIVE' && item.conference === filter
+        (item) =>
+          item.conference === filter &&
+          item.team_b !== 'TBD' &&
+          item.status !== 'COMPLETED'
       ),
     [filter, series]
   );
-  const upcomingSeries = useMemo(
-    () => series.filter((item) => item.status === 'UPCOMING'),
+
+  // TBD matchups (play-in winner not yet known) — shown without a betting form.
+  const pendingSeries = useMemo(
+    () => series.filter((item) => item.team_b === 'TBD' || item.team_a === 'TBD'),
     [series]
   );
 
@@ -268,7 +295,7 @@ export default function PredictPage() {
         </div>
 
         <div className="series-grid">
-          {activeSeries.map((seriesRow) => (
+          {bettableSeries.map((seriesRow) => (
             <SeriesPickCard
               key={seriesRow.series_id}
               series={seriesRow}
@@ -286,25 +313,27 @@ export default function PredictPage() {
         {picksError && <p className="error">{picksError}</p>}
       </section>
 
-      <section className="card">
-        <div className="card-header">
-          <div>
-            <h3>{t('predict.upcomingTitle')}</h3>
-            <p className="muted">{t('predict.upcomingSubtitle')}</p>
+      {pendingSeries.length > 0 && (
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h3>{t('predict.upcomingTitle')}</h3>
+              <p className="muted">{t('predict.upcomingSubtitle')}</p>
+            </div>
           </div>
-        </div>
-        <div className="series-grid">
-          {upcomingSeries.map((seriesRow) => (
-            <UpcomingCard
-              key={seriesRow.series_id}
-              series={seriesRow}
-              now={now}
-              t={t}
-              teamLogoMap={teamLogoMap}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="series-grid">
+            {pendingSeries.map((seriesRow) => (
+              <UpcomingCard
+                key={seriesRow.series_id}
+                series={seriesRow}
+                now={now}
+                t={t}
+                teamLogoMap={teamLogoMap}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="card">
         <div className="card-header">

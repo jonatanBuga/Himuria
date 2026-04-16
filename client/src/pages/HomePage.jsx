@@ -4,13 +4,7 @@ import { useSeasonModal } from '../contexts/SeasonModalContext.jsx';
 import useSeasonPicks from '../hooks/useSeasonPicks.js';
 import { useAuth } from '../contexts/AuthContext.jsx';
 import { supabase } from '../supabaseClient.js';
-import { fetchRoundAnalytics } from '../api.js';
-
-const highlights = [
-  { label: 'home.stats.members', value: '12' },
-  { label: 'home.stats.picks', value: '64' },
-  { label: 'home.stats.points', value: '840' },
-];
+import { fetchHomeStats, fetchRoundAnalytics } from '../api.js';
 
 // Home analytics uses real DB data; upcoming matchups are intentionally omitted here.
 
@@ -21,6 +15,11 @@ export default function HomePage() {
   const { draft, committed } = useSeasonPicks(auth?.token);
   const hasSeasonPicks = Boolean(committed?.champion_team || draft?.champion_team);
   const [analytics, setAnalytics] = React.useState(null);
+  const [stats, setStats] = React.useState({
+    activeFriends: 0,
+    picksSubmitted: 0,
+    totalPoints: 0,
+  });
   const [error, setError] = React.useState('');
 
   React.useEffect(() => {
@@ -29,6 +28,9 @@ export default function HomePage() {
       const token = auth?.token || (await supabase.auth.getSession()).data.session?.access_token;
       if (!token) return;
       try {
+        const statsData = await fetchHomeStats(token);
+        if (!active) return;
+        setStats(statsData);
         const data = await fetchRoundAnalytics(token);
         if (!active) return;
         setAnalytics(data);
@@ -61,12 +63,18 @@ export default function HomePage() {
           <p className="muted">{t('home.copy')}</p>
         </div>
         <div className="stat-grid">
-          {highlights.map((item) => (
-            <div key={item.label} className="stat-card">
-              <h3>{item.value}</h3>
-              <p className="muted">{t(item.label)}</p>
-            </div>
-          ))}
+          <div className="stat-card">
+            <h3>{stats.activeFriends}</h3>
+            <p className="muted">{t('home.stats.members')}</p>
+          </div>
+          <div className="stat-card">
+            <h3>{stats.picksSubmitted}</h3>
+            <p className="muted">{t('home.stats.picks')}</p>
+          </div>
+          <div className="stat-card">
+            <h3>{stats.totalPoints}</h3>
+            <p className="muted">{t('home.stats.points')}</p>
+          </div>
         </div>
       </section>
 

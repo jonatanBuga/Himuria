@@ -232,6 +232,16 @@ app.put('/api/draft/series', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Invalid series win totals.' });
   }
 
+  // Reject saves once the series has started.
+  const { data: seriesRow } = await supabaseAdmin
+    .from('series')
+    .select('start_time')
+    .eq('series_id', series_id)
+    .maybeSingle();
+  if (seriesRow && new Date(seriesRow.start_time).getTime() <= Date.now()) {
+    return res.status(403).json({ error: 'Betting for this series is closed.' });
+  }
+
   const payload = {
     user_id: req.user.id,
     series_id,
@@ -347,9 +357,12 @@ app.get('/api/analytics/round', requireAuth, async (req, res) => {
   // Optional conference mapping from series table if present.
   const { data: seriesRows } = await supabaseAdmin.from('series').select('*').in('series_id', seriesIds);
   const conferenceMap = new Map((seriesRows || []).map((row) => [row.series_id, row.conference]));
+  // 2026 NBA Playoffs teams — used as fallback when series table lacks conference data.
   const teamConferenceMap = new Map([
-    ['Celtics', 'EAST'], ['Knicks', 'EAST'], ['Bucks', 'EAST'], ['76ers', 'EAST'], ['Heat', 'EAST'], ['Cavaliers', 'EAST'],
-    ['Nuggets', 'WEST'], ['Timberwolves', 'WEST'], ['Thunder', 'WEST'], ['Mavericks', 'WEST'], ['Lakers', 'WEST'], ['Suns', 'WEST'],
+    ['Pistons', 'EAST'], ['Celtics', 'EAST'], ['Knicks', 'EAST'], ['Cavaliers', 'EAST'],
+    ['Raptors', 'EAST'], ['Hawks', 'EAST'], ['76ers', 'EAST'],
+    ['Thunder', 'WEST'], ['Spurs', 'WEST'], ['Nuggets', 'WEST'], ['Lakers', 'WEST'],
+    ['Rockets', 'WEST'], ['Timberwolves', 'WEST'], ['Blazers', 'WEST'],
   ]);
 
   const teamAgg = new Map();
@@ -407,66 +420,64 @@ app.get('/api/analytics/round', requireAuth, async (req, res) => {
 });
 
 app.get('/api/leaderboard', requireAuth, async (_req, res) => {
-  let { data: players, error } = await supabaseAdmin
+  // 1. Fetch every profile row — source of truth for who exists.
+  const { data: profiles, error: profilesError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email, username');
+  if (profilesError) return res.status(400).json({ error: profilesError.message });
+  if (!profiles || profiles.length === 0) return res.json([]);
+
+  const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+  // 2. Get existing leaderboard rows.
+  const { data: existing, error: existingError } = await supabaseAdmin
     .from('leaderboard_players')
     .select('*');
-  if (error) return res.status(400).json({ error: error.message });
+  if (existingError) return res.status(400).json({ error: existingError.message });
 
-  // Backfill leaderboard rows for confirmed users if missing.
-  if (!players || players.length === 0) {
-    const { data: usersData, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
+  const existingIds = new Set((existing || []).map((r) => r.user_id));
+
+  // 3. Insert a zeroed row for every profile that doesn't have one yet.
+  const missing = profiles.filter((p) => !existingIds.has(p.id));
+  if (missing.length) {
+    const insertPayload = missing.map((p) => {
+      const emailPrefix = p.email ? p.email.split('@')[0] : (p.username || `user_${p.id.slice(0, 6)}`);
+      return { user_id: p.id, username: emailPrefix, correct: 0, exact: 0, wrong: 0, total_points: 0 };
     });
-    if (usersError) return res.status(400).json({ error: usersError.message });
-
-    const confirmedUsers = (usersData?.users || []).filter((u) => u.email_confirmed_at);
-    const confirmedIds = confirmedUsers.map((u) => u.id);
-    if (confirmedIds.length) {
-      const { data: profiles, error: profilesError } = await supabaseAdmin
-        .from('profiles')
-        .select('id,username,email')
-        .in('id', confirmedIds);
-      if (profilesError) return res.status(400).json({ error: profilesError.message });
-
-      const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
-      const payload = confirmedUsers.map((user) => {
-        const profile = profileMap.get(user.id);
-        const baseEmail = profile?.email || user.email || '';
-        const fallbackName = baseEmail ? baseEmail.split('@')[0] : `user_${user.id.slice(0, 6)}`;
-        return {
-          user_id: user.id,
-          username: profile?.username || fallbackName,
-        };
-      });
-
-      if (payload.length) {
-        await supabaseAdmin.from('leaderboard_players').upsert(payload, { onConflict: 'user_id' });
-      }
-    }
-
-    const refreshed = await supabaseAdmin.from('leaderboard_players').select('*');
-    players = refreshed.data || [];
+    await supabaseAdmin.from('leaderboard_players').insert(insertPayload);
   }
 
-  const userIds = (players || []).map((row) => row.user_id).filter(Boolean);
-  const { data: seasonDrafts, error: draftError } = await supabaseAdmin
+  // 4. Combine: use existing rows + newly inserted ones.
+  const allRows = [
+    ...(existing || []),
+    ...missing.map((p) => ({ user_id: p.id, correct: 0, exact: 0, wrong: 0, total_points: 0 })),
+  ];
+
+  // 5. Fetch champion picks for display.
+  const userIds = allRows.map((r) => r.user_id).filter(Boolean);
+  const { data: seasonDrafts } = await supabaseAdmin
     .from('season_picks_draft')
     .select('user_id, champion_team')
     .in('user_id', userIds);
-  if (draftError) return res.status(400).json({ error: draftError.message });
+  const championMap = new Map((seasonDrafts || []).map((r) => [r.user_id, r.champion_team]));
 
-  const championMap = new Map((seasonDrafts || []).map((row) => [row.user_id, row.champion_team]));
-
-  const payload = (players || []).map((row) => ({
-    user_id: row.user_id,
-    username: row.username,
-    correct: row.correct || 0,
-    exact: row.exact || 0,
-    wrong: row.wrong || 0,
-    champion_team: championMap.get(row.user_id) || null,
-    total_points: calculateTotalPoints(row),
-  }));
+  // 6. Build response — username is always the email prefix.
+  const payload = allRows.map((row) => {
+    const profile = profileMap.get(row.user_id);
+    const email = profile?.email || '';
+    const displayName = email
+      ? email.split('@')[0]
+      : (row.username || `user_${String(row.user_id).slice(0, 6)}`);
+    return {
+      user_id: row.user_id,
+      username: displayName,
+      correct: row.correct || 0,
+      exact: row.exact || 0,
+      wrong: row.wrong || 0,
+      champion_team: championMap.get(row.user_id) || null,
+      total_points: calculateTotalPoints(row),
+    };
+  });
 
   payload.sort((a, b) => {
     if (b.total_points !== a.total_points) return b.total_points - a.total_points;
@@ -474,6 +485,33 @@ app.get('/api/leaderboard', requireAuth, async (_req, res) => {
   });
 
   return res.json(payload);
+});
+
+app.get('/api/home/stats', requireAuth, async (req, res) => {
+  const { count: membersCount, error: membersError } = await supabaseAdmin
+    .from('profiles')
+    .select('id', { count: 'exact', head: true });
+  if (membersError) return res.status(400).json({ error: membersError.message });
+
+  const { data: playerRow, error: playerError } = await supabaseAdmin
+    .from('leaderboard_players')
+    .select('total_points')
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (playerError) return res.status(400).json({ error: playerError.message });
+
+  const { data: committedRows, error: committedError } = await supabaseAdmin
+    .from('series_picks_committed')
+    .select('series_id')
+    .eq('user_id', req.user.id);
+  if (committedError) return res.status(400).json({ error: committedError.message });
+  const uniqueSeries = new Set((committedRows || []).map((row) => row.series_id)).size;
+
+  return res.json({
+    activeFriends: membersCount || 0,
+    totalPoints: playerRow?.total_points || 0,
+    picksSubmitted: uniqueSeries,
+  });
 });
 
 app.post('/api/admin/series/upsert', requireAuth, requireAdmin, async (req, res) => {
@@ -498,8 +536,9 @@ async function runCommitEngine() {
   if (error || !seriesRows) return;
 
   const lockThreshold = now.getTime();
+  // Lock picks at series start_time (Game 1 tip-off) — no early buffer.
   const seriesToLock = seriesRows.filter((row) => {
-    const start = new Date(row.start_time).getTime() - 60 * 1000;
+    const start = new Date(row.start_time).getTime();
     return start <= lockThreshold;
   });
 
@@ -544,7 +583,7 @@ async function runCommitEngine() {
     .filter((value) => !Number.isNaN(value));
   if (!startTimes.length) return;
 
-  const firstStart = Math.min(...startTimes) - 60 * 1000;
+  const firstStart = Math.min(...startTimes);
   const finalsStarts = seriesRows
     .filter((row) => row.round === 'FINALS')
     .map((row) => new Date(row.start_time).getTime());

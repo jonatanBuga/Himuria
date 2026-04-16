@@ -16,6 +16,7 @@ const translations = {
       home: 'Home',
       predict: 'Predict',
       leaderboard: 'Leaderboard',
+      bracket: 'Bracket',
       profile: 'Profile',
     },
     home: {
@@ -139,6 +140,18 @@ const translations = {
       editableLabel: 'Editable',
       locked: 'Locked',
     },
+    bracket: {
+      eyebrow: '2026 NBA Playoffs',
+      title: 'Bracket',
+      loading: 'Loading bracket…',
+      east: 'Eastern Conference',
+      west: 'Western Conference',
+      finals: 'NBA Finals',
+      round1: 'Round 1',
+      round2: 'Semifinals',
+      confFinals: 'Conf. Finals',
+      nbaFinals: 'NBA Finals',
+    },
     language: {
       label: 'Language',
       en: 'EN',
@@ -162,6 +175,7 @@ const translations = {
       home: 'בית',
       predict: 'תחזיות',
       leaderboard: 'טבלה',
+      bracket: 'סל',
       profile: 'פרופיל',
     },
     home: {
@@ -284,6 +298,18 @@ const translations = {
       edit: 'ערוך בחירות',
       editableLabel: 'ניתן לעריכה',
       locked: 'נעול',
+    },
+    bracket: {
+      eyebrow: 'פלייאוף NBA 2026',
+      title: 'סל הזכיות',
+      loading: 'טוען…',
+      east: 'קונפרנס מזרח',
+      west: 'קונפרנס מערב',
+      finals: 'גמר NBA',
+      round1: 'סיבוב 1',
+      round2: 'חצי גמר',
+      confFinals: 'גמר קונפרנס',
+      nbaFinals: 'גמר NBA',
     },
     language: {
       label: 'שפה',

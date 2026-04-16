@@ -115,3 +115,11 @@ export async function fetchLeaderboard(token) {
     },
   });
 }
+
+export async function fetchHomeStats(token) {
+  return request('/home/stats', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
